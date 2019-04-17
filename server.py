@@ -16,6 +16,5 @@ args = parser.parse_args()
 
 # Start server
 # =============================================================================
-serv = tftpy.TftpServer()
+serv = tftpy.TftpServer(tftproot=args.root)
 serv.listen(listenport=args.port)
-

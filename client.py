@@ -75,7 +75,6 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
     while len(rx_dat) > 0:
         path = rx_dat.decode('utf-8')
         dst = os.path.join(args.dest, path)
-        # print("DEBUG: {} + {} = {}".format(args.dest, path, dst))
         print("Downloading '{}' to '{}'".format(path, dst))
         os.makedirs(os.path.dirname(dst), exist_ok=True)
         client.download(path, dst)

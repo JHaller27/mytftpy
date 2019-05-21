@@ -37,15 +37,20 @@ def sendto_ack(sock: socket.socket, pkt_data, addr: (str, int)):
     while not ack_received:
         sock.sendto(pkt_data, addr)
 
-        rx_blknum = sock.recv(1)[0]
-        if rx_blknum == blknum:
-            ack_received = True
-            blknum = (blknum + 1) % 0x100
+        try:
+            rx_blknum = sock.recv(1)[0]
+
+            if rx_blknum == blknum:
+                ack_received = True
+                blknum = (blknum + 1) % 0x100
+        except socket.timeout:
+            print("\tTimed out, retrying...")
 
 
 dir_queue = []
 with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
     sock.bind(('0.0.0.0', 1069))
+    sock.settimeout(5)
 
     raw_data, addr = sock.recvfrom(2048)
     dir_queue.append(os.path.join(args.root, raw_data.decode('utf-8')))
@@ -56,6 +61,7 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
             for fname in filenames:
                 path = os.path.join(dirpath, fname)
                 path = path[path.index(args.root) + len(args.root) + 2:]
+                print(path)
                 sendto_ack(sock, path.encode('utf-8'), addr)
 
             dir_queue.extend(dirnames)

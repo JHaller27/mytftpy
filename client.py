@@ -2,6 +2,8 @@
 
 import tftpy
 import argparse
+import socket
+import os
 
 
 # Parse args
@@ -28,17 +30,57 @@ def s2ip4(addr: str, port: int = tftpy.DEF_TFTP_PORT) -> (str, int):
     return addr, port
 
 
-parser.add_argument("addr", help="TFTP server IPv4 address w/ optional port", default="localhost")
-parser.add_argument("path", help="Path to files to transmit")
-parser.add_argument('-d', '--dest', help="TFTP destination directory (default=<path>)", default=None)
+parser.add_argument("addr", type=s2ip4, help="TFTP server IPv4 address w/ optional port", default="localhost")
+parser.add_argument("-p", "--path", help="Path to files to transmit", default=".")
+parser.add_argument('-d', '--dest', help="TFTP destination directory (default=<path>)", default="./")
 
 args = parser.parse_args()
 
-if args.dest is None:
-    args.dest = args.path
+if args.dest[0].isalnum():
+    args.dest = os.path.join(".", args.dest)
 
 
 # Start transfer
 # =============================================================================
+blknum = 0
+
+
+def ack(sock: socket.socket, addr: (str, int)) -> None:
+    global blknum
+
+    ack_pkt = bytearray()
+    ack_pkt.append(blknum)
+    sock.sendto(ack_pkt, addr)
+    blknum = (blknum + 1) % 0x100
+
+
+def recv_ack(sock: socket.socket, addr: (str, int)) -> bytes:
+    data = sock.recv(1024)
+
+    ack(sock, addr)
+
+    return data
+
+
 client = tftpy.TftpClient(*args.addr)
-client.download(args.path, args.dest)
+
+name_serv_addr = (args.addr[0], 1069)
+with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+    sock.bind(('0.0.0.0', 1069))
+
+    print("Searching for {} on {}:{}".format(args.path, *name_serv_addr))
+    sock.sendto(args.path.encode('utf-8'), name_serv_addr)
+
+    rx_dat = recv_ack(sock, name_serv_addr)
+    while len(rx_dat) > 0:
+        path = rx_dat.decode('utf-8')
+        dst = os.path.join(args.dest, path)
+        # print("DEBUG: {} + {} = {}".format(args.dest, path, dst))
+        print("Downloading '{}' to '{}'".format(path, dst))
+        os.makedirs(os.path.dirname(dst), exist_ok=True)
+        client.download(path, dst)
+
+        rx_dat = recv_ack(sock, name_serv_addr)
+
+    ack(sock, name_serv_addr)
+    print("End of transfer")

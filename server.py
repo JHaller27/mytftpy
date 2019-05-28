@@ -50,11 +50,12 @@ def sendto_ack(sock: socket.socket, pkt_data, addr: (str, int)):
 dir_queue = []
 with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
     sock.bind(('0.0.0.0', 1069))
-    sock.settimeout(5)
 
     raw_data, addr = sock.recvfrom(2048)
     dir_queue.append(os.path.join(args.root, raw_data.decode('utf-8')))
     print("Searching for files in {}".format(dir_queue[0]))
+
+    sock.settimeout(5)
 
     while len(dir_queue) > 0:
         for dirpath, dirnames, filenames in os.walk(dir_queue.pop(0)):
